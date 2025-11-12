@@ -1,0 +1,11 @@
+DATA
+B C C A B A
+C B A C A B
+B A B A B A
+A C C C A C
+A C A B A B
+C B B B C C
+==
+==
+==
+/

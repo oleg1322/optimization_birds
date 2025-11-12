@@ -1,0 +1,17 @@
+DATA
+D D D C D E B C B C F E
+F D B D F B B C B C B D
+E D B C F A C A B D C D
+A E B C D A A A E A B A
+F F A E A E B E F C E F
+E B B D F E C C A C B E
+C D D F B A D D E F A E
+A A C D A A D E B F A A
+B D F F A F D E F C F F
+E D F A E F C E F B A F
+B D C E C B F C A A C B
+E B D E C C E B D F E C
+==
+==
+==
+/
