@@ -61,33 +61,39 @@ def is_solved(board: List[List[str]], N: int) -> bool:
 def count_complete(board: List[List[str]], N: int) -> int:
     return sum(1 for col in board if col and len(col) == N and len(set(col)) == 1)
 
-# ====================== ЭВРИСТИКА (очень сильная) ======================
+# ====================== ЭВРИСТИКА ======================
 def heuristic(board: List[List[str]], N: int, targets: Dict[str, int]) -> int:
     score = 0
     complete = count_complete(board, N)
     score -= complete * 10000
 
-    # Сколько птиц уже "на месте" в колонке
+    # Птицы на месте снизу
     for col in board:
         if not col: continue
         bottom = col[0]
-        matched = sum(1 for b in col if b == bottom)
+        matched = 0
+        for b in col:
+            if b == bottom:
+                matched += 1
+            else:
+                break
         score -= matched * 50
 
-    # Штраф за "мусор" сверху
+    # Штраф за мусор
     for col in board:
-        if not col: continue
-        if len(set(col)) == 1:
-            continue
-        # Сколько нужно переместить, чтобы освободить нижние
+        if not col or len(set(col)) == 1: continue
         for i in range(len(col)):
             if col[i] != col[0]:
                 score += (len(col) - i) * 5
                 break
 
-    # Бонус за свободные колонки
+    # Бонус за пустые
     empty = sum(1 for col in board if not col)
     score -= empty * 20
+
+    # Бонус за почти полные
+    almost = sum(1 for col in board if col and len(set(col)) == 1 and len(col) >= N - 2)
+    score -= almost * 100
 
     return score
 
@@ -95,12 +101,13 @@ def heuristic(board: List[List[str]], N: int, targets: Dict[str, int]) -> int:
 Move = Tuple[int, int]
 
 class Solver:
-    def __init__(self, board: List[List[str]], N: int, beam_width: int = 500):
+    def __init__(self, board: List[List[str]], N: int, beam_width: int = 500, max_states: int = 1000000):
         self.N = N
         self.num_cols = len(board)
         self.initial = [col[:] for col in board]
         self.targets = self.count_birds()
         self.beam_width = beam_width
+        self.max_states = max_states
 
     def count_birds(self) -> Dict[str, int]:
         count = defaultdict(int)
@@ -109,8 +116,7 @@ class Solver:
         for b, c in count.items():
             if c % self.N != 0:
                 logger.error(f"{b}: {c} не делится на {self.N}")
-                raise ValueError("Invalid count")
-        logger.info(f"Целевые колонки: {dict(count)}")
+                raise ValueError("Dividing fail")
         return count
 
     def get_moves(self, board: List[List[str]]) -> List[Move]:
@@ -145,6 +151,10 @@ class Solver:
                 logger.info(f"РЕШЕНИЕ НАЙДЕНО! Ходов: {len(path)}, L={L}, F={F}")
                 return path
 
+            if len(visited) > self.max_states:
+                logger.warning("Превышено максимальное число состояний.")
+                break
+
             for i, j in self.get_moves(board):
                 new_board = [col[:] for col in board]
                 bird = new_board[i].pop()
@@ -158,9 +168,9 @@ class Solver:
                     priority = new_cost + h
                     heapq.heappush(frontier, (priority, new_cost, new_state, path + [(i, j)]))
 
-            # Beam Search
+            # Beam
             if len(frontier) > self.beam_width:
-                frontier = frontier[:self.beam_width]
+                frontier = heapq.nsmallest(self.beam_width, frontier)
                 heapq.heapify(frontier)
 
         logger.warning("Решение не найдено.")
@@ -173,6 +183,7 @@ def main():
     parser.add_argument('input_file')
     parser.add_argument('--output', '-o')
     parser.add_argument('--beam', type=int, default=500, help='Beam width')
+    parser.add_argument('--max_states', type=int, default=1000000, help='Max visited states')
     args = parser.parse_args()
 
     logger.info(f"Входной файл: {args.input_file}")
@@ -190,7 +201,6 @@ def main():
         print("Решение не найдено")
         return
 
-    # === Симуляция для ORDER ===
     sim = [col[:] for col in board]
     order_lines = []
     for idx, (fr, to) in enumerate(solution, 1):
@@ -203,7 +213,6 @@ def main():
     K = len(solution)
     F = 100 * N * L - K
 
-    # === Лог ===
     logger.info("====")
     logger.info("перестановки")
     logger.info("====")
@@ -211,11 +220,11 @@ def main():
         logger.info(line)
     logger.info(f"ГОТОВО! F = {F}")
 
-    # === Вывод ===
     output = ["DATA"]
     for col in board:
         output.append("==" if not col else " ".join(col))
-    output.extend(["==", "==", "==", "/", "ORDER"])
+    output.extend(["==", "==", "==", "/"])
+    output.append("ORDER")
     for line in order_lines:
         parts = line.split()[1:]
         output.append(" ".join(parts))
